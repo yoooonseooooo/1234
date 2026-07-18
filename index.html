@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>중1 과학 - 나란한 힘의 합력과 평형 줄다리기 시뮬레이션 (모바일 최적화)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Noto Sans KR & Inter) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght=400;600;700;800&family=Noto+Sans+KR:wght=400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            -webkit-tap-highlight-color: transparent; /* 모바일 터치 깜빡임 방지 */
+        }
+        
+        /* 당기기 경기 중 줄 진동 효과 */
+        @keyframes rope-shake {
+            0%, 100% { transform: translateY(0); }
+            25% { transform: translateY(-2px); }
+            75% { transform: translateY(2px); }
+        }
+        .shaking-rope {
+            animation: rope-shake 0.1s infinite;
+        }
+
+        /* 캐릭터 승리 시 뛰는 효과 */
+        @keyframes jump-up-down {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-16px); }
+        }
+        .cheer-jump {
+            animation: jump-up-down 0.3s infinite alternate ease-out;
+        }
+
+        /* 땀방울 날아가는 효과 */
+        @keyframes sweat-fly {
+            0% { transform: translate(0, 0) scale(0.5); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translate(-10px, -10px) scale(1.1); opacity: 0; }
+        }
+        .sweat-active {
+            animation: sweat-fly 0.6s infinite ease-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between text-slate-800 overflow-x-hidden">
+
+    <header class="bg-gradient-to-r from-blue-600 via-indigo-600 to-red-600 text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-3 py-3 flex flex-col gap-2.5">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                    <div class="bg-white text-indigo-600 px-2 py-1 rounded-lg shadow-inner font-extrabold text-sm md:text-base shrink-0">
+                        ⚖️ F
+                    </div>
+                    <div>
+                        <h1 class="text-base md:text-xl font-black tracking-tight whitespace-nowrap">
+                            나란한 힘의 합력과 평형
+                        </h1>
+                        <p class="text-[10px] md:text-xs text-indigo-100 font-medium">중1 과학 실감 시뮬레이터</p>
+                    </div>
+                </div>
+                
+                <!-- 교사용 전용 출석부 토글 버튼 (모바일 축소형) -->
+                <button onclick="openTeacherDashboard()" class="bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-900 px-2.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1 shadow transition-all shrink-0">
+                    👨‍🏫 <span class="hidden xs:inline">교사용</span> 출석부
+                </button>
+            </div>
+            
+            <div class="flex items-center justify-between gap-2 border-t border-white/10 pt-2">
+                <!-- 모드 전환 탭 (모바일 스크롤 가능 구조) -->
+                <div class="flex bg-white/10 p-0.5 rounded-lg border border-white/20 gap-0.5 overflow-x-auto max-w-full">
+                    <button onclick="switchTab('sim')" id="tab-sim" class="px-2.5 py-1 rounded-md text-[11px] md:text-xs font-bold transition-all whitespace-nowrap bg-white text-indigo-700 shadow-sm">
+                        🎮 시뮬레이터
+                    </button>
+                    <button onclick="switchTab('mission')" id="tab-mission" class="px-2.5 py-1 rounded-md text-[11px] md:text-xs font-bold transition-all whitespace-nowrap text-white hover:bg-white/10">
+                        🎯 미션 도전
+                    </button>
+                    <button onclick="switchTab('theory')" id="tab-theory" class="px-2.5 py-1 rounded-md text-[11px] md:text-xs font-bold transition-all whitespace-nowrap text-white hover:bg-white/10">
+                        📖 개념 정리
+                    </button>
+                </div>
+
+                <!-- 접속중 뱃지 -->
+                <span id="user-badge" class="hidden bg-yellow-400 text-slate-900 text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm animate-pulse whitespace-nowrap shrink-0 max-w-[150px] overflow-hidden text-ellipsis"></span>
+                
+                <!-- 교사용 전용 출석부 토글 버튼 (모바일 축소형, 기본 숨김) -->
+                <button id="btn-teacher-dashboard" onclick="openTeacherDashboard()" class="hidden bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-900 px-2.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1 shadow transition-all shrink-0">
+                    👨‍🏫 <span class="hidden xs:inline">교사용</span> 출석부
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl w-full mx-auto p-3 flex-grow flex flex-col gap-4">
+        
+        <!-- 1. 시뮬레이터 탭 -->
+        <section id="content-sim" class="flex flex-col gap-4 transition-all duration-300">
+            <!-- 상황판 및 전광판 -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+                    
+                    <!-- 왼쪽 팀 총합 (청군) -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center flex justify-between md:flex-col items-center md:justify-center">
+                        <span class="text-blue-600 font-extrabold text-[10px] tracking-wider uppercase bg-blue-100 px-2 py-0.5 rounded-full">청군 (왼쪽)</span>
+                        <div class="text-2xl md:text-3xl font-black text-blue-700 md:mt-1" id="left-total-force">0 N</div>
+                        <p class="text-[9px] text-blue-500 hidden md:block" id="left-count">배치된 인원: 0명</p>
+                    </div>
+
+                    <!-- 가운데 합력 계산대 -->
+                    <div class="flex flex-col items-center justify-center py-2 px-1 bg-slate-50 rounded-xl border border-slate-100">
+                        <span class="text-slate-400 text-[10px] font-bold">합력 계산 (Net Force)</span>
+                        <div class="flex items-center gap-1.5 font-bold text-sm md:text-base text-slate-700 mt-1" id="formula-display">
+                            <span class="text-blue-600">0N</span>
+                            <span>-</span>
+                            <span class="text-red-600">0N</span>
+                            <span>=</span>
+                            <span class="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md font-black">0 N</span>
+                        </div>
+                        
+                        <!-- 평형 상태 여부 배지 -->
+                        <div id="equilibrium-badge" class="mt-2 px-3 py-1 rounded-full text-[10px] font-extrabold flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-300 animate-pulse">
+                            ✨ 평형 상태 (합력 = 0)
+                        </div>
+                    </div>
+
+                    <!-- 오른쪽 팀 총합 (백군) -->
+                    <div class="bg-red-50 border border-red-200 rounded-xl p-3 text-center flex justify-between md:flex-col items-center md:justify-center">
+                        <span class="text-red-600 font-extrabold text-[10px] tracking-wider uppercase bg-red-100 px-2 py-0.5 rounded-full">백군 (오른쪽)</span>
+                        <div class="text-2xl md:text-3xl font-black text-red-700 md:mt-1" id="right-total-force">0 N</div>
+                        <p class="text-[9px] text-red-500 hidden md:block" id="right-count">배치된 인원: 0명</p>
+                    </div>
+
+                </div>
+
+                <!-- 힘의 벡터 화살표 실시간 시각화 패널 -->
+                <div class="mt-3 border-t border-slate-100 pt-3">
+                    <div class="flex justify-between items-center text-[10px] font-bold text-slate-400 mb-1">
+                        <span>⬅️ 왼쪽 힘</span>
+                        <span class="text-indigo-600">실시간 합력 벡터 (크기와 방향)</span>
+                        <span>오른쪽 힘 ➡️</span>
+                    </div>
+                    <div class="relative w-full h-8 bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center">
+                        <!-- 센터 가이드라인 -->
+                        <div class="absolute left-1/2 top-0 bottom-0 w-0.5 bg-slate-300 z-10"></div>
+                        
+                        <!-- 합력 벡터 화살표 -->
+                        <div id="vector-arrow" class="absolute h-5 rounded-full transition-all duration-300 flex items-center justify-center text-[10px] font-black text-white px-2" style="width: 0px; left: 50%;">
+                            0 N
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 rounded-2xl p-4 relative overflow-hidden shadow-lg border border-slate-800 min-h-[300px] flex flex-col justify-between">
+                <!-- 경기장 배경 패턴 및 센터 마커 -->
+                <div class="absolute top-0 bottom-0 left-1/2 w-0.5 bg-dashed bg-white/15 -translate-x-1/2 z-0"></div>
+                <div class="absolute top-2 left-1/2 -translate-x-1/2 bg-slate-800 text-slate-400 text-[8px] px-1.5 py-0.5 rounded font-mono z-10 border border-slate-700">CENTER</div>
+
+                <!-- 선수 라인업 및 밧줄 인터랙션 레이아웃 -->
+                <div class="relative w-full flex-grow min-h-[180px] mt-2 flex items-end">
+                    
+                    <!-- 캐릭터가 줄 앞에 정렬되도록 Z-Index를 20으로 설정 (줄을 가림) - 모바일 오버랩 구조 -->
+                    <div class="absolute inset-x-0 bottom-1 h-36 flex justify-between px-4 items-end z-20 pointer-events-none">
+                        <!-- 왼쪽 팀 배치 영역 (-space-x 로 모바일 화면 대응) -->
+                        <div id="left-team-lineup" class="flex flex-row-reverse items-end justify-start -space-x-3 sm:-space-x-1 md:gap-2 h-full w-1/2 pointer-events-auto">
+                            <!-- 동적 추가 예정 -->
+                        </div>
+
+                        <!-- 오른쪽 팀 배치 영역 -->
+                        <div id="right-team-lineup" class="flex flex-row items-end justify-start -space-x-3 sm:-space-x-1 md:gap-2 h-full w-1/2 pointer-events-auto">
+                            <!-- 동적 추가 예정 -->
+                        </div>
+                    </div>
+
+                    <!-- 메인 로프 및 깃발 시각화 (캐릭터 뒤에 배치되도록 Z-Index를 10으로 설정) -->
+                    <div id="tug-rope-container" class="absolute inset-x-0 bottom-[48px] h-6 flex items-center pointer-events-none z-10 transition-all duration-300">
+                        <!-- 줄다리기 밧줄 -->
+                        <div id="tug-rope" class="absolute left-0 right-0 h-3 bg-amber-800 rounded-full shadow border-y border-amber-950 flex items-center justify-center transition-all duration-300">
+                            <!-- 로프 표면 눈금 무늬 효과 -->
+                            <div class="w-full h-full bg-[linear-gradient(45deg,#78350f_25%,transparent_25%,transparent_50%,#78350f_50%,#78350f_75%,transparent_75%,transparent)] bg-[length:10px_10px]"></div>
+                        </div>
+                        <!-- 로프 중심부 빨간 깃발 -->
+                        <div id="rope-flag" class="absolute left-1/2 -translate-x-1/2 -top-4 w-6 h-12 transition-all duration-300 flex flex-col items-center">
+                            <div class="w-1 h-8 bg-amber-200"></div>
+                            <div class="w-6 h-4 bg-red-600 rounded-xs -mt-8 animate-pulse shadow border border-red-700"></div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 컨트롤 버튼 및 결과판 -->
+                <div class="flex flex-col gap-2 bg-slate-800/60 p-2 rounded-xl border border-slate-700/50 z-20 mt-2">
+                    <div class="text-center px-1">
+                        <span id="simulation-status" class="text-indigo-300 font-bold text-[11px] md:text-xs tracking-wide">준비 완료! 양팀에 힘의 구성원을 추가해 보세요.</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center gap-2">
+                        <button onclick="resetSimulation()" class="px-3 py-2.5 bg-slate-700 hover:bg-slate-600 active:scale-95 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 shrink-0">
+                            🔄 초기화
+                        </button>
+
+                        <button onclick="startTugOfWar()" id="btn-pull" class="flex-grow py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-lg text-xs md:text-sm font-extrabold transition-all shadow-md shadow-indigo-500/20 flex items-center justify-center gap-1.5 min-h-[44px]">
+                            💪 영차! 당기기
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3">
+                <!-- 왼쪽 팀 캐릭터 추가 -->
+                <div class="bg-blue-50/50 rounded-2xl p-4 border border-blue-100 flex flex-col gap-2.5">
+                    <h3 class="text-blue-800 text-xs font-extrabold flex items-center gap-1.5">
+                        🔵 청군(왼쪽) 팀 구성원 추가하기
+                    </h3>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button onclick="addCharacter('left', 'kid')" class="bg-white hover:bg-blue-100 active:scale-95 border border-blue-200 p-2 rounded-xl transition-all flex flex-col items-center text-center gap-0.5 shadow-sm min-h-[48px]">
+                            <span class="text-xl">👦</span>
+                            <span class="font-bold text-[9px] text-slate-500">꼬마</span>
+                            <span class="text-blue-600 font-black text-[11px]">10N</span>
+                        </button>
+                        <button onclick="addCharacter('left', 'student')" class="bg-white hover:bg-blue-100 active:scale-95 border border-blue-200 p-2 rounded-xl transition-all flex flex-col items-center text-center gap-0.5 shadow-sm min-h-[48px]">
+                            <span class="text-xl">🧑</span>
+                            <span class="font-bold text-[9px] text-slate-500">학생</span>
+                            <span class="text-blue-600 font-black text-[11px]">20N</span>
+                        </button>
+                        <button onclick="addCharacter('left', 'adult')" class="bg-white hover:bg-blue-100 active:scale-95 border border-blue-200 p-2 rounded-xl transition-all flex flex-col items-center text-center gap-0.5 shadow-sm min-h-[48px]">
+                            <span class="text-xl">👨</span>
+                            <span class="font-bold text-[9px] text-slate-500">어른</span>
+                            <span class="text-blue-600 font-black text-[11px]">40N</span>
+                        </button>
+                        <button onclick="addCharacter('left', 'athlete')" class="bg-white hover:bg-blue-100 active:scale-95 border border-blue-200 p-2 rounded-xl transition-all flex flex-col items-center text-center gap-0.5 shadow-sm min-h-[48px]">
+                            <span class="text-xl">🧔</span>
+                            <span class="font-bold text-[9px] text-slate-500">체육인</span>
+                            <span class="text-blue-600 font-black text-[11px]">60N</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 오른쪽 팀 캐릭터 추가 -->
+                <div class="bg-red-50/50 rounded-2xl p-4 border border-red-100 flex flex-col gap-2.5">
+                    <h3 class="text-red-800 text-xs font-extrabold flex items-center gap-1.5">
+                        🔴 백군(오른쪽) 팀 구성원 추가하기
+                    </h3>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button onclick="addCharacter('right', 'kid')" class="bg-white hover:bg-red-100 active:scale-95 border border-red-200 p-2 rounded-xl transition-all flex flex-col items-center text-center gap-0.5 shadow-sm min-h-[48px]">
+                            <span class="text-xl">👦</span>
+                            <span class="font-bold text-[9px] text-slate-500">꼬마</span>
+                            <span class="text-red-600 font-black text-[11px]">10N</span>
+                        </button>
+                        <button onclick="addCharacter('right', 'student')" class="bg-white hover:bg-red-100 active:scale-95 border border-red-200 p-2 rounded-xl transition-all flex flex-col items-center text-center gap-0.5 shadow-sm min-h-[48px]">
+                            <span class="text-xl">🧑</span>
+                            <span class="font-bold text-[9px] text-slate-500">학생</span>
+                            <span class="text-red-600 font-black text-[11px]">20N</span>
+                        </button>
+                        <button onclick="addCharacter('right', 'adult')" class="bg-white hover:bg-red-100 active:scale-95 border border-red-200 p-2 rounded-xl transition-all flex flex-col items-center text-center gap-0.5 shadow-sm min-h-[48px]">
+                            <span class="text-xl">👨</span>
+                            <span class="font-bold text-[9px] text-slate-500">어른</span>
+                            <span class="text-red-600 font-black text-[11px]">40N</span>
+                        </button>
+                        <button onclick="addCharacter('right', 'athlete')" class="bg-white hover:bg-red-100 active:scale-95 border border-red-200 p-2 rounded-xl transition-all flex flex-col items-center text-center gap-0.5 shadow-sm min-h-[48px]">
+                            <span class="text-xl">🧔</span>
+                            <span class="font-bold text-[9px] text-slate-500">체육인</span>
+                            <span class="text-red-600 font-black text-[11px]">60N</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 미션 도전 탭 -->
+        <section id="content-mission" class="hidden flex-col gap-4 transition-all duration-300">
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                <h2 class="text-lg font-black text-indigo-800 flex items-center gap-1.5 mb-1">
+                    🎯 합력과 평형 미션 도전방!
+                </h2>
+                <p class="text-slate-400 text-xs">물리학적 조건에 맞춰 양 팀의 라인업을 똑똑하게 구성해 보세요.</p>
+                
+                <!-- 미션 목록 -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+                    <!-- 미션 카드 1 -->
+                    <div id="mission-card-1" class="border border-indigo-100 bg-indigo-50/10 rounded-xl p-4 hover:border-indigo-400 transition-all flex flex-col justify-between cursor-pointer" onclick="selectMission(1)">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="bg-indigo-100 text-indigo-700 font-extrabold text-[10px] px-2 py-0.5 rounded-full">미션 1</span>
+                                <span id="mission-status-1" class="text-[10px] font-bold text-slate-400">시도 전</span>
+                            </div>
+                            <h4 class="font-bold text-slate-800 text-sm mb-1">인원수가 다른 힘의 평형</h4>
+                            <p class="text-[10px] text-slate-400 leading-relaxed">왼쪽 2명, 오른쪽 1명만 배치하여 양팀이 힘의 평형(합력 0 N)을 이루도록 연출해 보세요!</p>
+                        </div>
+                        <button class="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors">
+                            도전하기
+                        </button>
+                    </div>
+
+                    <!-- 미션 카드 2 -->
+                    <div id="mission-card-2" class="border border-indigo-100 bg-indigo-50/10 rounded-xl p-4 hover:border-indigo-400 transition-all flex flex-col justify-between cursor-pointer" onclick="selectMission(2)">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="bg-indigo-100 text-indigo-700 font-extrabold text-[10px] px-2 py-0.5 rounded-full">미션 2</span>
+                                <span id="mission-status-2" class="text-[10px] font-bold text-slate-400">시도 전</span>
+                            </div>
+                            <h4 class="font-bold text-slate-800 text-sm mb-1">정확한 합력 구하기</h4>
+                            <p class="text-[10px] text-slate-400 leading-relaxed">합력이 오른쪽 방향(백군 승리)으로 정확히 30 N이 되도록 양쪽 팀을 구성해 보세요.</p>
+                        </div>
+                        <button class="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors">
+                            도전하기
+                        </button>
+                    </div>
+
+                    <!-- 미션 카드 3 -->
+                    <div id="mission-card-3" class="border border-indigo-100 bg-indigo-50/10 rounded-xl p-4 hover:border-indigo-400 transition-all flex flex-col justify-between cursor-pointer" onclick="selectMission(3)">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="bg-indigo-100 text-indigo-700 font-extrabold text-[10px] px-2 py-0.5 rounded-full">미션 3</span>
+                                <span id="mission-status-3" class="text-[10px] font-bold text-slate-400">시도 전</span>
+                            </div>
+                            <h4 class="font-bold text-slate-800 text-sm mb-1">꼬마들의 힘 합치기</h4>
+                            <p class="text-[10px] text-slate-400 leading-relaxed">왼쪽 팀에 꼬마(10N)만을 배치하여, 오른쪽 팀의 어른 1명(40N)과 완벽한 평형을 이루게 하세요.</p>
+                        </div>
+                        <button class="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors">
+                            도전하기
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 현재 활성화된 미션 가이드 보드 -->
+                <div id="active-mission-board" class="hidden mt-4 bg-slate-900 text-white p-4 rounded-xl border border-slate-700">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-amber-400 font-black text-[10px] uppercase tracking-wide">활성화된 도전 미션</span>
+                            <h3 id="active-mission-title" class="text-sm font-bold text-white mt-0.5">미션을 선택해 주세요</h3>
+                            <p id="active-mission-desc" class="text-[10px] text-slate-300 mt-1">위의 미션 카드 중 하나를 선택하면 전용 목표가 지정됩니다.</p>
+                        </div>
+                        <button onclick="quitMission()" class="text-[10px] text-slate-400 hover:text-white underline">포기</button>
+                    </div>
+                    
+                    <!-- 실시간 통과 체크 리스트 -->
+                    <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] border-t border-slate-800 pt-3">
+                        <div class="flex items-center gap-1.5">
+                            <span id="chk-cond-1" class="w-4 h-4 rounded-full flex items-center justify-center bg-slate-800 text-slate-500 font-bold">✓</span>
+                            <span id="chk-cond-1-txt" class="text-slate-300">조건 1 확인중...</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span id="chk-cond-2" class="w-4 h-4 rounded-full flex items-center justify-center bg-slate-800 text-slate-500 font-bold">✓</span>
+                            <span id="chk-cond-2-txt" class="text-slate-300">조건 2 확인중...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. 개념 학습 탭 -->
+        <section id="content-theory" class="hidden flex-col gap-4 transition-all duration-300">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- 같은 방향의 합력 -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">➡️➡️</span>
+                        <h3 class="text-sm font-extrabold text-slate-800">1. 같은 방향으로 작용하는 두 힘의 합력</h3>
+                    </div>
+                    <div class="bg-blue-50/50 p-3 rounded-xl border border-blue-100 text-xs leading-relaxed text-slate-600">
+                        한 물체에 두 힘이 같은 방향으로 나란하게 작용할 때, 합력의 방향은 <strong class="text-slate-800">두 힘의 방향과 같고</strong>, 합력의 크기는 <strong class="text-slate-800">두 힘의 크기를 더한 것</strong>과 같습니다.
+                    </div>
+                    <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-center font-bold text-indigo-700 text-base">
+                        F<sub>합력</sub> = F<sub>1</sub> + F<sub>2</sub>
+                    </div>
+                </div>
+
+                <!-- 반대 방향의 합력 -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">⬅️➡️</span>
+                        <h3 class="text-sm font-extrabold text-slate-800">2. 반대 방향으로 작용하는 두 힘의 합력</h3>
+                    </div>
+                    <div class="bg-red-50/50 p-3 rounded-xl border border-red-100 text-xs leading-relaxed text-slate-600">
+                        한 물체에 두 힘이 반대 방향으로 나란하게 작용할 때, 합력의 방향은 <strong class="text-slate-800">더 큰 힘의 방향</strong>과 같고, 합력의 크기는 <strong class="text-slate-800">큰 힘에서 작은 힘을 뺀 값</strong>과 같습니다.
+                    </div>
+                    <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-center font-bold text-indigo-700 text-base">
+                        F<sub>합력</sub> = F<sub>큰 힘</sub> - F<sub>작은 힘</sub>
+                    </div>
+                </div>
+
+                <!-- 힘의 평형 -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-2 md:col-span-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">⚖️</span>
+                        <h3 class="text-sm font-extrabold text-slate-800">3. 힘의 평형 (Force Equilibrium)이란?</h3>
+                    </div>
+                    <div class="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 text-xs leading-relaxed text-slate-600">
+                        <p class="font-bold text-emerald-700 mb-1">"합력이 0이 되어 아무런 움직임이 일어나지 않는 완벽한 멈춤 상태!"</p>
+                        한 물체에 작용하는 두 힘의 <strong class="text-slate-800">크기가 같고 방향이 반대</strong>일 때, 이 두 힘은 <strong class="text-emerald-700">평형 관계</strong>에 있다고 합니다. 이때 합력의 크기는 <strong class="text-slate-800">0 N</strong>이 됩니다.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 1. 입장 역할 선택 및 인증 모달 (최초 접속 시 오픈) -->
+    <div id="nickname-modal" class="fixed inset-0 bg-slate-900/85 backdrop-blur-sm z-50 flex items-center justify-center p-3">
+        <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 border-2 border-indigo-500">
+            
+            <!-- 화면 1: 역할 선택 화면 -->
+            <div id="role-select-view" class="flex flex-col items-center">
+                <span class="text-4xl animate-bounce">⚖️</span>
+                <h3 class="text-lg font-black text-indigo-900 mt-2">줄다리기 가상 실험실</h3>
+                <p class="text-slate-400 text-[11px] mt-1 text-center">나란한 힘의 합력과 평형<br>실험실에 오신 것을 환영합니다!</p>
+                <div class="mt-5 w-full flex flex-col gap-2.5">
+                    <button onclick="showTeacherLoginView()" class="w-full py-3.5 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-900 font-black rounded-xl shadow-md transition-all text-sm flex items-center justify-center gap-2">
+                        👨‍🏫 교사(Teacher)로 입장
+                    </button>
+                    <button onclick="showStudentLoginView()" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-black rounded-xl shadow-md transition-all text-sm flex items-center justify-center gap-2">
+                        🧑‍🎓 학생(Student)으로 입장
+                    </button>
+                </div>
+            </div>
+
+            <!-- 화면 2: 교사 비밀번호 인증 화면 -->
+            <div id="teacher-login-view" class="hidden flex flex-col items-center">
+                <span class="text-4xl">🔑</span>
+                <h3 class="text-lg font-black text-amber-600 mt-2">교사 인증</h3>
+                <p class="text-slate-400 text-[11px] mt-0.5 text-center">출석부 관리 및 수업 제어를 위한 비밀번호를 입력해주세요.</p>
+                <div class="mt-4 w-full flex flex-col gap-2.5">
+                    <input type="password" id="input-teacher-password" placeholder="비밀번호 입력 (기본: 1234)" 
+                           class="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-amber-500 focus:outline-none text-center font-bold text-base text-slate-800" />
+                    <div class="flex gap-2">
+                        <button onclick="showRoleSelectView()" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl transition-all text-xs">
+                            이전으로
+                        </button>
+                        <button onclick="submitTeacherPassword()" class="flex-1 py-3 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-900 font-black rounded-xl shadow-md transition-all text-xs">
+                            인증 및 입장
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 화면 3: 학생 닉네임 등록 화면 -->
+            <div id="student-login-view" class="hidden flex flex-col items-center">
+                <span class="text-4xl">✍️</span>
+                <h3 class="text-lg font-black text-indigo-900 mt-2">과학 실험실 출석체크</h3>
+                <p class="text-slate-400 text-[11px] mt-0.5 text-center">오늘 줄다리기 수업에 참여할 멋진 닉네임을 적어주세요!</p>
+                <div class="mt-4 w-full flex flex-col gap-2.5">
+                    <input type="text" id="input-nickname" maxlength="8" placeholder="예: 뉴턴, 아르키메데스" 
+                           class="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-500 focus:outline-none text-center font-bold text-base text-indigo-900" />
+                    <div class="flex gap-2">
+                        <button onclick="showRoleSelectView()" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl transition-all text-xs">
+                            이전으로
+                        </button>
+                        <button onclick="submitStudentNickname()" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-black rounded-xl shadow-md transition-all text-xs">
+                            출석 및 입장
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 2. 교사용 출석 관리 대시보드 모달 (모달 최대 한도와 너비 모바일 강화) -->
+    <div id="teacher-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden items-center justify-center p-3">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden border-2 border-amber-500">
+            <!-- 모달 헤더 -->
+            <div class="bg-gradient-to-r from-amber-500 to-amber-600 text-slate-900 px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">👨‍🏫</span>
+                    <div>
+                        <h3 class="font-black text-sm">실시간 학생 출석 현황</h3>
+                        <p class="text-[9px] text-slate-800 font-bold">참여 중인 전체 학생 목록입니다.</p>
+                    </div>
+                </div>
+                <button onclick="closeTeacherDashboard()" class="text-slate-900 hover:bg-black/10 w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm">✕</button>
+            </div>
+            
+            <!-- 모달 바디 (목록) -->
+            <div class="p-4 overflow-y-auto flex-grow flex flex-col gap-3">
+                <div class="flex justify-between items-center bg-slate-100 px-3 py-2 rounded-lg">
+                    <span class="text-[10px] font-bold text-slate-500">현재 온라인 출석자</span>
+                    <span id="teacher-attendance-count" class="bg-amber-100 text-amber-800 font-black text-[10px] px-2 py-0.5 rounded-full border border-amber-300">총 0명</span>
+                </div>
+                
+                <!-- 출석 리스트 컨테이너 (넓은 1열 가로형 리스트) -->
+                <div id="attendance-list-container" class="flex flex-col gap-2 min-h-[100px] overflow-y-auto">
+                    <!-- 동적 리스트가 채워집니다 -->
+                </div>
+            </div>
+            
+            <!-- 모달 푸터 -->
+            <div class="bg-slate-50 p-3 border-t border-slate-100 flex justify-between items-center gap-2">
+                <button onclick="promptResetAttendance()" class="px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-[10px] font-bold transition-all active:scale-95 shadow">
+                    🗑️ 초기화
+                </button>
+                <button onclick="closeTeacherDashboard()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-[10px] font-bold transition-all active:scale-95 shadow">
+                    닫기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 교사용 출석 삭제 보안 비밀번호 확인 커스텀 다이얼로그 -->
+    <div id="reset-confirm-modal" class="fixed inset-0 bg-black/75 backdrop-blur-xs z-55 hidden items-center justify-center p-3">
+        <div class="bg-white rounded-2xl shadow-xl p-4 max-w-xs w-full border border-rose-500 text-center">
+            <span class="text-2xl">⚠️</span>
+            <h4 class="font-extrabold text-sm mt-1 text-rose-600">출석부 전체 초기화</h4>
+            <p class="text-[10px] text-slate-500 mt-0.5">계속하려면 교사용 초기화 코드(기본값: 1234)를 입력하세요.</p>
+            <input type="password" id="reset-passcode" placeholder="보안 코드 입력" class="w-full text-center border border-rose-200 rounded-lg py-1.5 px-3 mt-2.5 focus:outline-none focus:border-rose-500 font-bold text-sm" />
+            <div class="flex gap-2 mt-3">
+                <button onclick="cancelReset()" class="flex-1 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-md">취소</button>
+                <button onclick="executeResetAttendance()" class="flex-1 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-md shadow">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 메시지 경고용 토스트 팝업 -->
+    <div id="toast-container" class="fixed bottom-4 right-4 left-4 sm:left-auto z-50 flex flex-col gap-1.5"></div>
+
+    <!-- 푸터 영역 -->
+    <footer class="bg-slate-100 border-t border-slate-200 py-3 text-center text-[10px] text-slate-400">
+        <div class="max-w-6xl mx-auto px-3">
+            <p>© 2026 중등 과학 가상 실험실. 나란한 힘의 합력과 평형 줄다리기 시뮬레이터.</p>
+        </div>
+    </footer>
+
+    <!-- Firebase JS SDK & Logic Script Module -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- 1. Firebase 전역 설정 및 초기화 ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'tug-of-war-simulation';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "",
+            authDomain: "tug-of-war-sim.firebaseapp.com",
+            projectId: "tug-of-war-sim",
+            storageBucket: "tug-of-war-sim.appspot.com",
+            messagingSenderId: "12345678",
+            appId: "1:12345678:web:12345678"
+        };
+
+        let app, db, auth, userId;
+        let isAuthReady = false;
+        let myNickname = "";
+        let myRole = ""; // 'teacher' 또는 'student'
+
+        // --- 2. 전역 시뮬레이터 물리 상태 정의 ---
+        const CharacterSpecs = {
+            kid: { emoji: '👦', force: 10, label: '꼬마', scale: 0.72, thickness: 8, chest: 12 },
+            student: { emoji: '🧑', force: 20, label: '학생', scale: 0.85, thickness: 11, chest: 16 },
+            adult: { emoji: '👨', force: 40, label: '어른', scale: 1.0, thickness: 14, chest: 20 },
+            athlete: { emoji: '🧔', force: 60, label: '체육인', scale: 1.15, thickness: 18, chest: 26 }
+        };
+
+        let leftTeam = [];
+        let rightTeam = [];
+        let isPulling = false;
+        let gameResult = null; // null, 'draw', 'left', 'right'
+        let audioCtx = null;
+        let currentMission = null;
+
+        // --- 3. 미션 정보 정의 ---
+        const missions = {
+            1: {
+                title: "인원수가 다른 힘의 평형",
+                desc: "왼쪽 팀은 2명, 오른쪽 팀은 1명만 배치하여 양팀이 힘의 평형(합력 0 N)을 이루게 만드세요!",
+                validator: () => {
+                    const cond1 = leftTeam.length === 2 && rightTeam.length === 1;
+                    const cond2 = calculateForce('left') === calculateForce('right');
+                    return {
+                        cond1: { pass: cond1, text: `왼쪽 2명, 오른쪽 1명 배치 (현재: 왼쪽 ${leftTeam.length}명, 오른쪽 ${rightTeam.length}명)` },
+                        cond2: { pass: cond2, text: `힘의 평형 달성 (현재 합력: ${Math.abs(calculateForce('left') - calculateForce('right'))} N)` },
+                        success: cond1 && cond2
+                    };
+                }
+            },
+            2: {
+                title: "정확한 합력 구하기",
+                desc: "합력이 오른쪽 방향(백군 승리)으로 정확히 30 N이 되도록 양쪽 팀을 구성해 보세요.",
+                validator: () => {
+                    const diff = calculateForce('right') - calculateForce('left');
+                    const cond1 = diff === 30;
+                    const cond2 = leftTeam.length > 0 && rightTeam.length > 0;
+                    return {
+                        cond1: { pass: cond1, text: `오른쪽 방향 합력 30 N (현재: ${diff > 0 ? '오른쪽 ' + diff : '왼쪽 ' + Math.abs(diff)} N)` },
+                        cond2: { pass: cond2, text: `양 팀에 최소 한 명 이상 배치` },
+                        success: cond1 && cond2
+                    };
+                }
+            },
+            3: {
+                title: "꼬마들의 힘 합치기",
+                desc: "왼쪽 팀에 꼬마(10N)만을 배치하여, 오른쪽 팀의 어른 1명(40N)과 완벽한 평형을 이루게 만드세요.",
+                validator: () => {
+                    const leftOnlyKids = leftTeam.length > 0 && leftTeam.every(char => char === 'kid');
+                    const rightAdultOnly = rightTeam.length === 1 && rightTeam[0] === 'adult';
+                    const cond1 = leftOnlyKids && rightAdultOnly;
+                    const cond2 = calculateForce('left') === 40;
+                    return {
+                        cond1: { pass: cond1, text: `왼쪽은 오직 꼬마들만, 오른쪽은 어른 1명만` },
+                        cond2: { pass: cond2, text: `두 팀의 힘의 평형 (현재 왼쪽: ${calculateForce('left')} N / 오른쪽: ${calculateForce('right')} N)` },
+                        success: cond1 && cond2
+                    };
+                }
+            }
+        };
+
+        // --- Firebase 인증 절차 수립 및 에러 예방 ---
+        window.addEventListener('DOMContentLoaded', async () => {
+            initAudio();
+            updateDashboard();
+            renderTeams();
+            
+            // Firebase 초기화 시작
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                let userCredential;
+                if (token) {
+                    userCredential = await signInWithCustomToken(auth, token);
+                } else {
+                    userCredential = await signInAnonymously(auth);
+                }
+                userId = userCredential.user.uid;
+                isAuthReady = true;
+                
+                // 실시간 출석 리스너 활성화
+                listenAttendance();
+            } catch (err) {
+                console.error("Firebase Auth or Initializer failed:", err);
+                showToast("실시간 서버 연결 실패. 로컬 모드로 정상 작동합니다.", "warning");
+            }
+        });
+
+        function showRoleSelectView() {
+            playSound('click');
+            document.getElementById('role-select-view').classList.remove('hidden');
+            document.getElementById('teacher-login-view').classList.add('hidden');
+            document.getElementById('student-login-view').classList.add('hidden');
+        }
+
+        function showTeacherLoginView() {
+            playSound('click');
+            document.getElementById('role-select-view').classList.add('hidden');
+            document.getElementById('teacher-login-view').classList.remove('hidden');
+            document.getElementById('student-login-view').classList.add('hidden');
+            document.getElementById('input-teacher-password').focus();
+        }
+
+        function showStudentLoginView() {
+            playSound('click');
+            document.getElementById('role-select-view').classList.add('hidden');
+            document.getElementById('teacher-login-view').classList.add('hidden');
+            document.getElementById('student-login-view').classList.remove('hidden');
+            document.getElementById('input-nickname').focus();
+        }
+
+        async function submitTeacherPassword() {
+            const pwdField = document.getElementById('input-teacher-password');
+            const pwd = pwdField.value.trim();
+            if (pwd !== '1234') {
+                showToast("비밀번호가 올바르지 않습니다. (기본: 1234)", "error");
+                return;
+            }
+
+            myRole = 'teacher';
+            
+            // 교사용 출석부 버튼 활성화
+            const btn = document.getElementById('btn-teacher-dashboard');
+            if (btn) btn.classList.remove('hidden');
+
+            // 모달 닫기
+            document.getElementById('nickname-modal').classList.add('hidden');
+            
+            // 헤더에 역할 배지 표시
+            const badge = document.getElementById('user-badge');
+            if (badge) {
+                badge.innerText = `👨‍🏫 교사 관리자`;
+                badge.classList.remove('hidden');
+                badge.className = "bg-amber-400 text-slate-900 text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm whitespace-nowrap shrink-0 max-w-[120px] overflow-hidden text-ellipsis";
+            }
+
+            playSound('win');
+            showToast("교사 권한으로 성공적으로 인증되었습니다!", "success");
+            
+            // 교사용 대시보드 자동 열기
+            openTeacherDashboard();
+        }
+
+        async function submitStudentNickname() {
+            const inputField = document.getElementById('input-nickname');
+            const nick = inputField.value.trim();
+            if (!nick) {
+                showToast("유효한 닉네임을 적어주세요!", "warning");
+                return;
+            }
+
+            myNickname = nick;
+            myRole = 'student';
+
+            // 교사용 대시보드 버튼 학생화면에서는 강제 숨김
+            const btn = document.getElementById('btn-teacher-dashboard');
+            if (btn) btn.classList.add('hidden');
+
+            if (isAuthReady) {
+                try {
+                    // RULE 1: Strict Paths 규격 준수
+                    const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'attendance', userId);
+                    await setDoc(userDocRef, {
+                        nickname: myNickname,
+                        timestamp: Date.now(),
+                        userId: userId
+                    });
+                    
+                    // 성공 피드백 배지
+                    const badge = document.getElementById('user-badge');
+                    if (badge) {
+                        badge.innerText = `✅ 출석함: 👤 ${myNickname}`;
+                        badge.classList.remove('hidden');
+                        badge.className = "bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm whitespace-nowrap shrink-0 max-w-[150px] overflow-hidden text-ellipsis animate-pulse";
+                    }
+                } catch (error) {
+                    console.error("Attendance submission fail:", error);
+                }
+            }
+
+            // 모달 닫기
+            document.getElementById('nickname-modal').classList.add('hidden');
+            playSound('win');
+            showToast(`출석 완료! 즐거운 실험 되세요, ${myNickname}님!`, "success");
+        }
+
+        let attendanceList = [];
+        function listenAttendance() {
+            if (!isAuthReady) return;
+            // RULE 1: Strict Paths 규격 준수
+            const attendanceColRef = collection(db, 'artifacts', appId, 'public', 'data', 'attendance');
+            
+            // RULE 2: 복잡한 orderby 배제 및 JS 메모리 정렬
+            onSnapshot(attendanceColRef, (snapshot) => {
+                attendanceList = [];
+                let stillPresent = false;
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    attendanceList.push(data);
+                    if (data.userId === userId) {
+                        stillPresent = true;
+                    }
+                });
+                
+                // 시간순 역순 정렬 (최신 등록자가 위로)
+                attendanceList.sort((a, b) => b.timestamp - a.timestamp);
+                
+                // 실시간 카운트 갱신
+                updateAttendanceDisplay();
+
+                // 학생 상태인데 교사가 출석부에서 나를 지웠거나 초기화했다면 로그인 모달을 다시 띄움
+                if (myRole === 'student' && !stillPresent && !document.getElementById('nickname-modal').classList.contains('hidden') === false) {
+                    myNickname = "";
+                    document.getElementById('user-badge').classList.add('hidden');
+                    showRoleSelectView();
+                    document.getElementById('nickname-modal').classList.remove('hidden');
+                    showToast("선생님이 출석부를 초기화했거나 출석이 정지되었습니다. 다시 출석해주세요!", "warning");
+                }
+            }, (error) => {
+                console.error("onSnapshot error:", error);
+            });
+        }
+
+        // --- 교사용 대시보드 조작 및 초기화 연출 ---
+        function updateAttendanceDisplay() {
+            const container = document.getElementById('attendance-list-container');
+            const countLabel = document.getElementById('teacher-attendance-count');
+            
+            countLabel.innerText = `총 ${attendanceList.length}명 출석 완료`;
+            container.innerHTML = '';
+
+            if (attendanceList.length === 0) {
+                container.innerHTML = `<div class="text-center text-slate-400 py-6 text-xs">현재 출석한 학생이 없습니다.</div>`;
+                return;
+            }
+
+            attendanceList.forEach((student) => {
+                const item = document.createElement('div');
+                const isMe = student.userId === userId;
+                const meBorder = isMe ? 'ring-2 ring-indigo-500' : 'border-slate-100';
+                
+                item.className = `bg-slate-50 border ${meBorder} rounded-xl p-2.5 flex items-center shadow-sm w-full`;
+                
+                item.innerHTML = `
+                    <div class="flex items-center justify-between gap-2 w-full">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="text-lg shrink-0">🧑‍🎓</span>
+                            <span class="font-extrabold text-xs text-slate-800 whitespace-nowrap overflow-hidden text-ellipsis">${student.nickname}</span>
+                            ${isMe ? '<span class="text-[8px] bg-indigo-100 text-indigo-700 font-black px-1.5 py-0.5 rounded-full shrink-0">나</span>' : ''}
+                        </div>
+                        <div class="text-right shrink-0">
+                            <span class="text-[9px] text-slate-400 font-bold whitespace-nowrap bg-slate-200/50 px-2 py-0.5 rounded">
+                                ${new Date(student.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function openTeacherDashboard() {
+            if (myRole !== 'teacher') {
+                showToast("교사 권한이 필요한 페이지입니다.", "error");
+                return;
+            }
+            playSound('click');
+            document.getElementById('teacher-modal').classList.remove('hidden');
+            document.getElementById('teacher-modal').classList.add('flex');
+            updateAttendanceDisplay();
+        }
+
+        function closeTeacherDashboard() {
+            playSound('click');
+            document.getElementById('teacher-modal').classList.add('hidden');
+            document.getElementById('teacher-modal').classList.remove('flex');
+        }
+
+        function promptResetAttendance() {
+            playSound('click');
+            document.getElementById('reset-confirm-modal').classList.remove('hidden');
+            document.getElementById('reset-confirm-modal').classList.add('flex');
+            document.getElementById('reset-passcode').value = '';
+            document.getElementById('reset-passcode').focus();
+        }
+
+        function cancelReset() {
+            playSound('click');
+            document.getElementById('reset-confirm-modal').classList.add('hidden');
+            document.getElementById('reset-confirm-modal').classList.remove('flex');
+        }
+
+        async function executeResetAttendance() {
+            const code = document.getElementById('reset-passcode').value.trim();
+            if (code !== '1234') {
+                showToast("비밀번호가 올바르지 않습니다. (기본값: 1234)", "error");
+                return;
+            }
+
+            if (!isAuthReady) {
+                showToast("서버 연결이 아직 안정적이지 않습니다.", "warning");
+                return;
+            }
+
+            try {
+                const attendanceColRef = collection(db, 'artifacts', appId, 'public', 'data', 'attendance');
+                const querySnapshot = await getDocs(attendanceColRef);
+                
+                const deletePromises = [];
+                querySnapshot.forEach((documentSnap) => {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'attendance', documentSnap.id);
+                    deletePromises.push(deleteDoc(docRef));
+                });
+
+                await Promise.all(deletePromises);
+                
+                showToast("출석부가 깨끗하게 청소되었습니다!", "success");
+                cancelReset();
+                
+                // 학생 역할을 지우고 있는 경우에만 로그인창으로 유도
+                if (myRole === 'student') {
+                    myNickname = "";
+                    document.getElementById('user-badge').classList.add('hidden');
+                    showRoleSelectView();
+                    document.getElementById('nickname-modal').classList.remove('hidden');
+                }
+                
+            } catch (err) {
+                console.error("Error clearing attendance:", err);
+                showToast("초기화 처리 중 에러가 발생했습니다.", "error");
+            }
+        }
+
+        // --- STREAMING_CHUNK: Setting up audio synth feedback... ---
+        // --- 효과음 사운드 신디사이저 엔진 ---
+        function initAudio() {
+            try {
+                window.AudioContext = window.AudioContext || window.webkitAudioContext;
+            } catch(e) {
+                console.warn('Web Audio API 미지원 환경');
+            }
+        }
+
+        function playSound(type) {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'pull') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(70, audioCtx.currentTime + 0.4);
+                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            } else if (type === 'win') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(261.63, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(329.63, audioCtx.currentTime + 0.1);
+                osc.frequency.setValueAtTime(392.00, audioCtx.currentTime + 0.2);
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.5);
+            } else if (type === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'equilibrium') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime + 0.12);
+                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.24);
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.5);
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = 'bg-slate-800 text-white';
+            if (type === 'success') bgClass = 'bg-emerald-600 text-white';
+            if (type === 'error') bgClass = 'bg-red-600 text-white';
+            if (type === 'warning') bgClass = 'bg-amber-500 text-white';
+
+            toast.className = `${bgClass} px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold flex items-center gap-2 transform translate-y-2 opacity-0 transition-all duration-300`;
+            toast.innerHTML = `<span>💬</span> <span>${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 50);
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function switchTab(tabId) {
+            playSound('click');
+            document.getElementById('content-sim').classList.add('hidden');
+            document.getElementById('content-mission').classList.add('hidden');
+            document.getElementById('content-theory').classList.add('hidden');
+            document.getElementById('content-sim').classList.remove('flex');
+            document.getElementById('content-mission').classList.remove('flex');
+            document.getElementById('content-theory').classList.remove('flex');
+
+            const tabs = ['sim', 'mission', 'theory'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                btn.className = "px-2.5 py-1 rounded-md text-[11px] md:text-xs font-bold transition-all text-white hover:bg-white/10";
+            });
+
+            const activeContent = document.getElementById(`content-${tabId}`);
+            activeContent.classList.remove('hidden');
+            activeContent.classList.add('flex');
+
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            activeBtn.className = "px-2.5 py-1 rounded-md text-[11px] md:text-xs font-bold transition-all bg-white text-indigo-700 shadow-sm";
+        }
+
+        function calculateForce(team) {
+            const arr = team === 'left' ? leftTeam : rightTeam;
+            return arr.reduce((acc, current) => acc + CharacterSpecs[current].force, 0);
+        }
+
+        // --- STREAMING_CHUNK: Defining anatomical vector SVG models... ---
+        // --- Advanced SVG Cartoon Character Generation Engine (발끝 노이즈 제거 특화) ---
+        function getCharacterSVG(team, type, state) {
+            const spec = CharacterSpecs[type];
+            const primaryColor = team === 'left' ? '#2563eb' : '#dc2626';     // 메인 셔츠 색상
+            const shadowColor = team === 'left' ? '#1d4ed8' : '#b91c1c';      // 셔츠 음영 색상
+            const pantsColor = team === 'left' ? '#1e3b8a' : '#7f1d1d';       // 바지 색상
+            const skinColor = '#fbcfe8';                                      // 살구색 피부톤
+            const headEmoji = spec.emoji;
+            const limbWidth = spec.thickness;                                 // 팔다리 굵기
+            const chestW = spec.chest;                                        // 가슴 너비
+            const scale = spec.scale;
+
+            let showSweat = false;
+            let characterElements = '';
+            let clipDefs = '';
+
+            const idSeed = Math.random().toString(36).substr(2, 5);
+
+            if (state === 'pulling' || state === 'draw') {
+                showSweat = (state === 'pulling');
+                
+                // [몸통 중심 설계] : 영차 자세
+                const shoulderX = 35, shoulderY = 56;
+                const waistX = 45, waistY = 96;
+                const headCenterX = 28;
+                const headCenterY = 36;
+
+                clipDefs = `
+                    <clipPath id="clip-head-${type}-${idSeed}">
+                        <circle cx="${headCenterX}" cy="${headCenterY}" r="15" />
+                    </clipPath>
+                    <linearGradient id="shirt-grad-${idSeed}" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="${primaryColor}" />
+                        <stop offset="100%" stop-color="${shadowColor}" />
+                    </linearGradient>
+                `;
+
+                characterElements = `
+                    <!-- 1. 다리 관절 -->
+                    <line x1="${waistX - chestW * 0.25}" y1="${waistY + 2}" x2="18" y2="128" stroke="${pantsColor}" stroke-width="${limbWidth * 1.3}" stroke-linecap="round" />
+                    <path d="M ${waistX + chestW * 0.25} ${waistY} Q 58 114 56 128" fill="none" stroke="${pantsColor}" stroke-width="${limbWidth * 1.3}" stroke-linecap="round" />
+                    
+                    <!-- 흰색 양말 포인트 -->
+                    <line x1="18" y1="126" x2="17" y2="131" stroke="#ffffff" stroke-width="${limbWidth * 1.2}" stroke-linecap="butt" />
+                    <line x1="56" y1="126" x2="56" y2="131" stroke="#ffffff" stroke-width="${limbWidth * 1.2}" stroke-linecap="butt" />
+
+                    <!-- 2. 운동화 -->
+                    <rect x="9" y="129" width="16" height="7" rx="3.5" fill="#334155" />
+                    <rect x="48" y="129" width="16" height="7" rx="3.5" fill="#334155" />
+
+                    <!-- 3. 목 관절선 -->
+                    <line x1="${shoulderX}" y1="${shoulderY}" x2="${headCenterX}" y2="${headCenterY}" stroke="${skinColor}" stroke-width="${limbWidth * 0.9}" stroke-linecap="round" />
+                    
+                    <!-- 4. 옷 몸통 및 소매 -->
+                    <path d="M ${shoulderX - chestW * 0.5} ${shoulderY + 4} L ${shoulderX + chestW * 0.5} ${shoulderY - 4} L ${waistX + chestW * 0.4} ${waistY} L ${waistX - chestW * 0.4} ${waistY} Z" fill="url(#shirt-grad-${idSeed})" stroke="${shadowColor}" stroke-width="1.5" stroke-linejoin="round" />
+                    
+                    <!-- 5. 팔 -->
+                    <!-- 뒷팔 -->
+                    <path d="M ${shoulderX - chestW * 0.3} ${shoulderY + 4} Q 32 74 52 76" fill="none" stroke="${skinColor}" stroke-width="${limbWidth * 0.9}" stroke-linecap="round" />
+                    <line x1="${shoulderX - chestW * 0.3}" y1="${shoulderY + 4}" x2="${shoulderX - chestW * 0.1}" y2="${shoulderY + 14}" stroke="url(#shirt-grad-${idSeed})" stroke-width="${limbWidth * 1.2}" stroke-linecap="round" />
+                    
+                    <!-- 앞팔 -->
+                    <path d="M ${shoulderX + chestW * 0.3} ${shoulderY - 2} Q 48 74 68 76" fill="none" stroke="${skinColor}" stroke-width="${limbWidth * 0.9}" stroke-linecap="round" />
+                    <line x1="${shoulderX + chestW * 0.3}" y1="${shoulderY - 2}" x2="${shoulderX + chestW * 0.4}" y2="${shoulderY + 8}" stroke="url(#shirt-grad-${idSeed})" stroke-width="${limbWidth * 1.2}" stroke-linecap="round" />
+
+                    <!-- 6. 헤드 렌더러 -->
+                    <g clip-path="url(#clip-head-${type}-${idSeed})">
+                        <rect x="${headCenterX - 18}" y="${headCenterY - 18}" width="36" height="36" fill="transparent" />
+                        <text x="${headCenterX}" y="${headCenterY + 1}" font-size="25" text-anchor="middle" dominant-baseline="central">${headEmoji}</text>
+                    </g>
+                    <circle cx="${headCenterX}" cy="${headCenterY}" r="15" stroke="${shadowColor}" stroke-width="1.5" fill="none" pointer-events="none" />
+                `;
+            } else if (state === 'win') {
+                // [몸통 중심 설계] : 만세/승리 점핑 자세
+                const shoulderX = 50, shoulderY = 52;
+                const waistX = 50, waistY = 88;
+                const headCenterX = 50, headCenterY = 32;
+
+                clipDefs = `
+                    <clipPath id="clip-head-${type}-${idSeed}">
+                        <circle cx="${headCenterX}" cy="${headCenterY}" r="15" />
+                    </clipPath>
+                    <linearGradient id="shirt-grad-${idSeed}" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="${primaryColor}" />
+                        <stop offset="100%" stop-color="${shadowColor}" />
+                    </linearGradient>
+                `;
+
+                characterElements = `
+                    <!-- 다리 관절 -->
+                    <path d="M ${waistX - chestW * 0.25} ${waistY} Q 32 104 36 118" fill="none" stroke="${pantsColor}" stroke-width="${limbWidth * 1.3}" stroke-linecap="round" />
+                    <path d="M ${waistX + chestW * 0.25} ${waistY} Q 68 104 64 118" fill="none" stroke="${pantsColor}" stroke-width="${limbWidth * 1.3}" stroke-linecap="round" />
+                    
+                    <!-- 흰색 양말 -->
+                    <line x1="36" y1="116" x2="36" y2="121" stroke="#ffffff" stroke-width="${limbWidth * 1.2}" stroke-linecap="butt" />
+                    <line x1="64" y1="116" x2="64" y2="121" stroke="#ffffff" stroke-width="${limbWidth * 1.2}" stroke-linecap="butt" />
+
+                    <!-- 운동화 -->
+                    <rect x="29" y="119" width="14" height="7" rx="3.5" fill="#334155" />
+                    <rect x="57" y="119" width="14" height="7" rx="3.5" fill="#334155" />
+
+                    <!-- 목 선 -->
+                    <line x1="${shoulderX}" y1="${shoulderY}" x2="${headCenterX}" y2="${headCenterY}" stroke="${skinColor}" stroke-width="${limbWidth * 0.9}" stroke-linecap="round" />
+                    
+                    <!-- 옷 몸통 -->
+                    <path d="M ${shoulderX - chestW * 0.6} ${shoulderY} L ${shoulderX + chestW * 0.6} ${shoulderY} L ${waistX + chestW * 0.4} ${waistY} L ${waistX - chestW * 0.4} ${waistY} Z" fill="url(#shirt-grad-${idSeed})" stroke="${shadowColor}" stroke-width="1.5" stroke-linejoin="round" />
+
+                    <!-- 양팔 만세 -->
+                    <path d="M ${shoulderX - chestW * 0.4} ${shoulderY} Q 24 24 18 8" fill="none" stroke="${skinColor}" stroke-width="${limbWidth * 0.9}" stroke-linecap="round" />
+                    <line x1="${shoulderX - chestW * 0.4}" y1="${shoulderY}" x2="${shoulderX - chestW * 0.45}" y2="${shoulderY - 10}" stroke="url(#shirt-grad-${idSeed})" stroke-width="${limbWidth * 1.2}" stroke-linecap="round" />
+
+                    <path d="M ${shoulderX + chestW * 0.4} ${shoulderY} Q 76 24 82 8" fill="none" stroke="${skinColor}" stroke-width="${limbWidth * 0.9}" stroke-linecap="round" />
+                    <line x1="${shoulderX + chestW * 0.4}" y1="${shoulderY}" x2="${shoulderX + chestW * 0.45}" y2="${shoulderY - 10}" stroke="url(#shirt-grad-${idSeed})" stroke-width="${limbWidth * 1.2}" stroke-linecap="round" />
+
+                    <!-- 헤드 렌더러 -->
+                    <g clip-path="url(#clip-head-${type}-${idSeed})">
+                        <rect x="${headCenterX - 18}" y="${headCenterY - 18}" width="36" height="36" fill="transparent" />
+                        <text x="${headCenterX}" y="${headCenterY + 1}" font-size="25" text-anchor="middle" dominant-baseline="central">😆</text>
+                    </g>
+                    <circle cx="${headCenterX}" cy="${headCenterY}" r="15" stroke="${shadowColor}" stroke-width="1.5" fill="none" pointer-events="none" />
+                `;
+            } else if (state === 'lose') {
+                // [몸통 중심 설계] : 패배/넘어짐 자세
+                const shoulderX = 60, shoulderY = 66;
+                const waistX = 42, waistY = 96;
+                const headCenterX = 68;
+                const headCenterY = 52;
+
+                clipDefs = `
+                    <clipPath id="clip-head-${type}-${idSeed}">
+                        <circle cx="${headCenterX}" cy="${headCenterY}" r="15" />
+                    </clipPath>
+                    <linearGradient id="shirt-grad-${idSeed}" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="${primaryColor}" />
+                        <stop offset="100%" stop-color="${shadowColor}" />
+                    </linearGradient>
+                `;
+
+                characterElements = `
+                    <line x1="${waistX - chestW * 0.2}" y1="${waistY}" x2="16" y2="120" stroke="${pantsColor}" stroke-width="${limbWidth * 1.3}" stroke-linecap="round" />
+                    <line x1="${waistX + chestW * 0.2}" y1="${waistY}" x2="38" y2="120" stroke="${pantsColor}" stroke-width="${limbWidth * 1.3}" stroke-linecap="round" />
+                    
+                    <!-- 양말 -->
+                    <line x1="16" y1="118" x2="16" y2="123" stroke="#ffffff" stroke-width="${limbWidth * 1.2}" stroke-linecap="butt" />
+                    <line x1="38" y1="118" x2="38" y2="123" stroke="#ffffff" stroke-width="${limbWidth * 1.2}" stroke-linecap="butt" />
+
+                    <rect x="9" y="121" width="14" height="7" rx="3.5" fill="#334155" />
+                    <rect x="31" y="121" width="14" height="7" rx="3.5" fill="#334155" />
+
+                    <!-- 목 선 -->
+                    <line x1="${shoulderX}" y1="${shoulderY}" x2="${headCenterX}" y2="${headCenterY}" stroke="${skinColor}" stroke-width="${limbWidth * 0.9}" stroke-linecap="round" />
+                    
+                    <!-- 기울어진 옷 몸통 -->
+                    <path d="M ${shoulderX - chestW * 0.4} ${shoulderY + 4} L ${shoulderX + chestW * 0.4} ${shoulderY - 4} L ${waistX + chestW * 0.3} ${waistY} L ${waistX - chestW * 0.3} ${waistY} Z" fill="url(#shirt-grad-${idSeed})" stroke="${shadowColor}" stroke-width="1.5" stroke-linejoin="round" />
+
+                    <!-- 무너진 팔 -->
+                    <path d="M ${shoulderX} ${shoulderY} Q 68 74 80 76" fill="none" stroke="${skinColor}" stroke-width="${limbWidth * 0.9}" stroke-linecap="round" />
+
+                    <!-- 헤드 렌더러 -->
+                    <g clip-path="url(#clip-head-${type}-${idSeed})">
+                        <rect x="${headCenterX - 18}" y="${headCenterY - 18}" width="36" height="36" fill="transparent" />
+                        <text x="${headCenterX}" y="${headCenterY + 1}" font-size="25" text-anchor="middle" dominant-baseline="central">😭</text>
+                    </g>
+                    <circle cx="${headCenterX}" cy="${headCenterY}" r="15" stroke="${shadowColor}" stroke-width="1.5" fill="none" pointer-events="none" />
+                `;
+            } else {
+                // [몸통 중심 설계] : 평시(Idle) 자세
+                const shoulderX = 50, shoulderY = 56;
+                const waistX = 50, waistY = 94;
+                const headCenterX = 50, headCenterY = 36;
+
+                clipDefs = `
+                    <clipPath id="clip-head-${type}-${idSeed}">
+                        <circle cx="${headCenterX}" cy="${headCenterY}" r="15" />
+                    </clipPath>
+                    <linearGradient id="shirt-grad-${idSeed}" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="${primaryColor}" />
+                        <stop offset="100%" stop-color="${shadowColor}" />
+                    </linearGradient>
+                `;
+
+                characterElements = `
+                    <line x1="${waistX - chestW * 0.3}" y1="${waistY + 2}" x2="34" y2="128" stroke="${pantsColor}" stroke-width="${limbWidth * 1.3}" stroke-linecap="round" />
+                    <line x1="${waistX + chestW * 0.3}" y1="${waistY + 2}" x2="66" y2="128" stroke="${pantsColor}" stroke-width="${limbWidth * 1.3}" stroke-linecap="round" />
+                    
+                    <!-- 흰색 양말 밴드 -->
+                    <line x1="34" y1="126" x2="34" y2="131" stroke="#ffffff" stroke-width="${limbWidth * 1.2}" stroke-linecap="butt" />
+                    <line x1="66" y1="126" x2="66" y2="131" stroke="#ffffff" stroke-width="${limbWidth * 1.2}" stroke-linecap="butt" />
+
+                    <!-- 스니커즈 -->
+                    <rect x="25" y="129" width="16" height="7" rx="3.5" fill="#334155" />
+                    <rect x="59" y="129" width="16" height="7" rx="3.5" fill="#334155" />
+
+                    <!-- 목 선 -->
+                    <line x1="${shoulderX}" y1="${shoulderY}" x2="${headCenterX}" y2="${headCenterY}" stroke="${skinColor}" stroke-width="${limbWidth * 0.9}" stroke-linecap="round" />
+                    
+                    <!-- 몸통 패치 -->
+                    <path d="M ${shoulderX - chestW * 0.5} ${shoulderY} L ${shoulderX + chestW * 0.5} ${shoulderY} L ${waistX + chestW * 0.4} ${waistY} L ${waistX - chestW * 0.4} ${waistY} Z" fill="url(#shirt-grad-${idSeed})" stroke="${shadowColor}" stroke-width="1.5" stroke-linejoin="round" />
+
+                    <!-- 양팔 -->
+                    <path d="M ${shoulderX - chestW * 0.4} ${shoulderY + 2} Q 36 74 44 76" fill="none" stroke="${skinColor}" stroke-width="${limbWidth * 0.9}" stroke-linecap="round" />
+                    <line x1="${shoulderX - chestW * 0.4}" y1="${shoulderY + 2}" x2="${shoulderX - chestW * 0.3}" y2="${shoulderY + 12}" stroke="url(#shirt-grad-${idSeed})" stroke-width="${limbWidth * 1.2}" stroke-linecap="round" />
+
+                    <path d="M ${shoulderX + chestW * 0.4} ${shoulderY + 2} Q 64 74 56 76" fill="none" stroke="${skinColor}" stroke-width="${limbWidth * 0.9}" stroke-linecap="round" />
+                    <line x1="${shoulderX + chestW * 0.4}" y1="${shoulderY + 2}" x2="${shoulderX + chestW * 0.3}" y2="${shoulderY + 12}" stroke="url(#shirt-grad-${idSeed})" stroke-width="${limbWidth * 1.2}" stroke-linecap="round" />
+
+                    <!-- 헤드 렌더러 -->
+                    <g clip-path="url(#clip-head-${type}-${idSeed})">
+                        <rect x="${headCenterX - 18}" y="${headCenterY - 18}" width="36" height="36" fill="transparent" />
+                        <text x="${headCenterX}" y="${headCenterY + 1}" font-size="25" text-anchor="middle" dominant-baseline="central">${headEmoji}</text>
+                    </g>
+                    <circle cx="${headCenterX}" cy="${headCenterY}" r="15" stroke="${shadowColor}" stroke-width="1.5" fill="none" pointer-events="none" />
+                `;
+            }
+
+            let svgContent = `<defs>${clipDefs}</defs>`;
+            svgContent += `<g transform="scale(${scale}) translate(${(100 - 100 * scale) / 2}, ${150 - 150 * scale})">`;
+
+            if (showSweat) {
+                svgContent += `
+                    <g class="sweat-active" transform="translate(10, -5)">
+                        <text x="5" y="26" font-size="12">💦</text>
+                    </g>
+                    <g class="sweat-active" transform="translate(-15, 2)">
+                        <text x="25" y="32" font-size="10">💦</text>
+                    </g>
+                `;
+            }
+
+            svgContent += characterElements;
+            svgContent += `</g>`;
+
+            return `
+                <svg viewBox="0 0 100 150" class="w-12 h-20 xs:w-16 xs:h-24 sm:w-20 sm:h-32 md:w-24 md:h-36 transition-all duration-300">
+                    ${svgContent}
+                </svg>
+            `;
+        }
+
+        // --- STREAMING_CHUNK: Updating the dashboard calculations and SVG renderings... ---
+        function updateDashboard() {
+            const leftForce = calculateForce('left');
+            const rightForce = calculateForce('right');
+            const diff = leftForce - rightForce;
+
+            document.getElementById('left-total-force').innerText = `${leftForce} N`;
+            document.getElementById('right-total-force').innerText = `${rightForce} N`;
+            document.getElementById('left-count').innerText = `배치된 인원: ${leftTeam.length}명`;
+            document.getElementById('right-count').innerText = `배치된 인원: ${rightTeam.length}명`;
+
+            const formulaDisplay = document.getElementById('formula-display');
+            let formulaHTML = ``;
+            if (leftForce >= rightForce) {
+                formulaHTML = `<span class="text-blue-600 font-black">${leftForce}N</span> <span class="text-slate-400">-</span> <span class="text-red-600 font-black">${rightForce}N</span> <span class="text-slate-400">=</span> <span class="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded shadow-inner font-black">${Math.abs(diff)} N</span>`;
+            } else {
+                formulaHTML = `<span class="text-red-600 font-black">${rightForce}N</span> <span class="text-slate-400">-</span> <span class="text-blue-600 font-black">${leftForce}N</span> <span class="text-slate-400">=</span> <span class="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded shadow-inner font-black">${Math.abs(diff)} N</span>`;
+            }
+            if (diff === 0) {
+                formulaHTML = `<span class="text-blue-600 font-black">${leftForce}N</span> <span class="text-slate-400">-</span> <span class="text-red-600 font-black">${rightForce}N</span> <span class="text-slate-400">=</span> <span class="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded shadow-inner font-black">0 N</span>`;
+            }
+            formulaDisplay.innerHTML = formulaHTML;
+
+            const eqBadge = document.getElementById('equilibrium-badge');
+            if (diff === 0 && (leftTeam.length > 0 || rightTeam.length > 0)) {
+                eqBadge.classList.remove('hidden');
+                eqBadge.classList.add('flex');
+            } else {
+                eqBadge.classList.add('hidden');
+                eqBadge.classList.remove('flex');
+            }
+
+            const vectorArrow = document.getElementById('vector-arrow');
+            const scaleFactor = 0.35; 
+            const widthPct = Math.min(Math.abs(diff) * scaleFactor, 45);
+
+            if (diff === 0) {
+                vectorArrow.style.width = '0px';
+                vectorArrow.style.left = '50%';
+                vectorArrow.innerText = '0 N';
+                vectorArrow.className = "absolute h-5 rounded-full transition-all duration-300 flex items-center justify-center text-[9px] font-black bg-slate-400 text-white px-2";
+            } else if (diff > 0) { 
+                vectorArrow.style.width = `${widthPct}%`;
+                vectorArrow.style.left = `${50 - widthPct}%`;
+                vectorArrow.innerText = `⬅️ 합력 ${diff}N`;
+                vectorArrow.className = "absolute h-5 rounded-l-full rounded-r-none transition-all duration-300 flex items-center justify-center text-[9px] font-black bg-gradient-to-r from-blue-600 to-indigo-500 text-white px-2 shadow-sm";
+            } else { 
+                vectorArrow.style.width = `${widthPct}%`;
+                vectorArrow.style.left = `50%`;
+                vectorArrow.innerText = `${Math.abs(diff)}N ➡️`;
+                vectorArrow.className = "absolute h-5 rounded-r-full rounded-l-none transition-all duration-300 flex items-center justify-center text-[9px] font-black bg-gradient-to-r from-indigo-500 to-red-600 text-white px-2 shadow-sm";
+            }
+
+            if (currentMission) {
+                evaluateMission();
+            }
+        }
+
+        function renderTeams() {
+            const leftContainer = document.getElementById('left-team-lineup');
+            const rightContainer = document.getElementById('right-team-lineup');
+
+            leftContainer.innerHTML = '';
+            leftTeam.forEach((charKey, idx) => {
+                const spec = CharacterSpecs[charKey];
+                const card = document.createElement('div');
+                
+                let characterState = 'idle';
+                let movementClass = '';
+
+                if (isPulling) {
+                    characterState = 'pulling';
+                } else if (gameResult === 'left') {
+                    characterState = 'win';
+                    movementClass = 'cheer-jump';
+                } else if (gameResult === 'right') {
+                    characterState = 'lose';
+                } else if (gameResult === 'draw') {
+                    characterState = 'draw';
+                }
+
+                card.className = `relative flex flex-col items-center group transition-transform ${movementClass} shrink-0`;
+                card.style.animationDelay = `${idx * 0.05}s`;
+
+                card.innerHTML = `
+                    <button onclick="removeCharacter('left', ${idx})" class="absolute -top-3 -right-1 bg-red-500 hover:bg-red-600 active:scale-95 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow z-30 pointer-events-auto">×</button>
+                    <span class="bg-blue-600 text-white text-[8px] font-extrabold px-1 py-0.2 rounded-full mb-0.5 shadow-sm z-10 select-none">${spec.force}N</span>
+                    <div class="filter drop-shadow-[0_2px_4px_rgba(59,130,246,0.2)] select-none">
+                        ${getCharacterSVG('left', charKey, characterState)}
+                    </div>
+                `;
+                leftContainer.appendChild(card);
+            });
+
+            rightContainer.innerHTML = '';
+            rightTeam.forEach((charKey, idx) => {
+                const spec = CharacterSpecs[charKey];
+                const card = document.createElement('div');
+                
+                let characterState = 'idle';
+                let movementClass = '';
+
+                if (isPulling) {
+                    characterState = 'pulling';
+                } else if (gameResult === 'right') {
+                    characterState = 'win';
+                    movementClass = 'cheer-jump';
+                } else if (gameResult === 'left') {
+                    characterState = 'lose';
+                } else if (gameResult === 'draw') {
+                    characterState = 'draw';
+                }
+
+                card.className = `relative flex flex-col items-center group transition-transform ${movementClass} shrink-0`;
+                card.style.animationDelay = `${idx * 0.05}s`;
+
+                card.innerHTML = `
+                    <button onclick="removeCharacter('right', ${idx})" class="absolute -top-3 -right-1 bg-red-500 hover:bg-red-600 active:scale-95 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow z-30 pointer-events-auto">×</button>
+                    <span class="bg-red-500 text-white text-[8px] font-extrabold px-1 py-0.2 rounded-full mb-0.5 shadow-sm z-10 select-none">${spec.force}N</span>
+                    <div class="filter drop-shadow-[0_2px_4px_rgba(239,68,68,0.2)] transform scale-x-[-1] select-none">
+                        ${getCharacterSVG('right', charKey, characterState)}
+                    </div>
+                `;
+                rightContainer.appendChild(card);
+            });
+        }
+
+        // --- 경기장 컨트롤 액션 정의 ---
+        function addCharacter(team, charKey) {
+            playSound('click');
+            const teamArr = team === 'left' ? leftTeam : rightTeam;
+            gameResult = null;
+
+            if (teamArr.length >= 4) {
+                showToast("한 팀당 최대 4명까지만 영입할 수 있습니다!", "warning");
+                return;
+            }
+
+            teamArr.push(charKey);
+            renderTeams();
+            updateDashboard();
+        }
+
+        function removeCharacter(team, index) {
+            playSound('click');
+            const teamArr = team === 'left' ? leftTeam : rightTeam;
+            gameResult = null;
+            teamArr.splice(index, 1);
+            renderTeams();
+            updateDashboard();
+        }
+
+        function resetSimulation() {
+            playSound('click');
+            leftTeam = [];
+            rightTeam = [];
+            isPulling = false;
+            gameResult = null;
+            renderTeams();
+            updateDashboard();
+
+            const ropeContainer = document.getElementById('tug-rope-container');
+            const rope = document.getElementById('tug-rope');
+            const flag = document.getElementById('rope-flag');
+            
+            ropeContainer.style.transform = `translateX(0px)`;
+            flag.style.left = '50%';
+            rope.classList.remove('shaking-rope');
+
+            document.getElementById('simulation-status').innerText = "준비 완료! 양팀에 힘의 구성원을 추가해 보세요.";
+            document.getElementById('simulation-status').className = "text-indigo-300 font-bold text-[11px] md:text-xs tracking-wide";
+        }
+
+        // --- STREAMING_CHUNK: Pull physics engine with mobile performance tweaks... ---
+        // 줄다리기 경기 실행 애니메이션
+        function startTugOfWar() {
+            if (leftTeam.length === 0 && rightTeam.length === 0) {
+                showToast("줄을 잡고 당길 선수가 없습니다! 선수를 영입해 주세요.", "warning");
+                return;
+            }
+
+            playSound('pull');
+
+            const leftForce = calculateForce('left');
+            const rightForce = calculateForce('right');
+            const diff = leftForce - rightForce;
+
+            const ropeContainer = document.getElementById('tug-rope-container');
+            const rope = document.getElementById('tug-rope');
+            const flag = document.getElementById('rope-flag');
+            const statusLabel = document.getElementById('simulation-status');
+
+            isPulling = true;
+            gameResult = null;
+            renderTeams();
+
+            rope.classList.add('shaking-rope');
+            statusLabel.innerText = "영차! 영차! 양팀 모두 온 힘을 다해 버티고 있습니다!";
+            statusLabel.className = "text-amber-400 font-extrabold text-[11px] md:text-xs tracking-wide animate-pulse";
+
+            setTimeout(() => {
+                rope.classList.remove('shaking-rope');
+                isPulling = false;
+
+                if (diff === 0) {
+                    gameResult = 'draw';
+                    playSound('equilibrium');
+                    
+                    ropeContainer.style.transform = `translateX(0px)`;
+                    flag.style.left = '50%';
+                    
+                    statusLabel.innerText = "⚖️ 힘의 평형! 양쪽 합력 크기가 같아 합력은 0 N입니다!";
+                    statusLabel.className = "text-emerald-400 font-extrabold text-[11px] md:text-xs tracking-wide";
+                    showToast("훌륭합니다! 완전한 힘의 평형을 이루었습니다.", "success");
+                } else if (diff > 0) {
+                    gameResult = 'left';
+                    playSound('win');
+                    
+                    ropeContainer.style.transform = `translateX(-30px)`;
+                    flag.style.left = '42%';
+                    
+                    statusLabel.innerText = `🔵 청군(왼쪽) 승리! 합력이 왼쪽으로 ${Math.abs(diff)} N 작용합니다.`;
+                    statusLabel.className = "text-blue-400 font-extrabold text-[11px] md:text-xs tracking-wide";
+                    showToast(`청군이 합력 (${Math.abs(diff)} N)의 승리로 이끌었습니다!`, "success");
+                } else {
+                    gameResult = 'right';
+                    playSound('win');
+                    
+                    ropeContainer.style.transform = `translateX(30px)`;
+                    flag.style.left = '58%';
+
+                    statusLabel.innerText = `🔴 백군(오른쪽) 승리! 합력이 오른쪽으로 ${Math.abs(diff)} N 작용합니다.`;
+                    statusLabel.className = "text-red-400 font-extrabold text-[11px] md:text-xs tracking-wide";
+                    showToast(`백군이 합력 (${Math.abs(diff)} N)의 승리로 이끌었습니다!`, "success");
+                }
+
+                renderTeams();
+
+                if (currentMission) {
+                    const validation = missions[currentMission].validator();
+                    if (validation.success) {
+                        handleMissionSuccess(currentMission);
+                    }
+                }
+
+            }, 1200); // 모바일 기기의 피로감을 고려해 애니메이션 시간을 1.2초로 소폭 압축
+        }
+
+        // --- 미션 도전방 컨트롤러 ---
+        function selectMission(missionId) {
+            playSound('click');
+            currentMission = missionId;
+            const missionData = missions[missionId];
+
+            const activeBoard = document.getElementById('active-mission-board');
+            activeBoard.classList.remove('hidden');
+            
+            document.getElementById('active-mission-title').innerText = `${missionId}. ${missionData.title}`;
+            document.getElementById('active-mission-desc').innerText = missionData.desc;
+
+            switchTab('sim');
+            showToast(`[미션 ${missionId}] 활성화! 기준에 맞춰 선수를 올리세요.`, "info");
+
+            evaluateMission();
+        }
+
+        function quitMission() {
+            playSound('click');
+            currentMission = null;
+            document.getElementById('active-mission-board').classList.add('hidden');
+            showToast("미션 도전을 비활성화했습니다.");
+        }
+
+        function evaluateMission() {
+            if (!currentMission) return;
+
+            const missionData = missions[currentMission];
+            const validation = missionData.validator();
+
+            const chk1 = document.getElementById('chk-cond-1');
+            const chk1Txt = document.getElementById('chk-cond-1-txt');
+            const chk2 = document.getElementById('chk-cond-2');
+            const chk2Txt = document.getElementById('chk-cond-2-txt');
+
+            chk1Txt.innerText = validation.cond1.text;
+            if (validation.cond1.pass) {
+                chk1.className = "w-4 h-4 rounded-full flex items-center justify-center bg-emerald-600 text-white font-bold transition-all duration-300";
+            } else {
+                chk1.className = "w-4 h-4 rounded-full flex items-center justify-center bg-slate-800 text-slate-500 font-bold";
+            }
+
+            chk2Txt.innerText = validation.cond2.text;
+            if (validation.cond2.pass) {
+                chk2.className = "w-4 h-4 rounded-full flex items-center justify-center bg-emerald-600 text-white font-bold transition-all duration-300";
+            } else {
+                chk2.className = "w-4 h-4 rounded-full flex items-center justify-center bg-slate-800 text-slate-500 font-bold";
+            }
+
+            if (validation.success) {
+                document.getElementById('simulation-status').innerText = "🔥 조건 통과! '당기기' 버튼을 눌러 미션을 완료하세요.";
+                document.getElementById('simulation-status').className = "text-emerald-400 font-extrabold text-[11px] md:text-xs animate-bounce";
+            }
+        }
+
+        function handleMissionSuccess(missionId) {
+            playSound('win');
+            
+            const statusLabel = document.getElementById(`mission-status-${missionId}`);
+            statusLabel.innerText = "⭐ 미션 통과!";
+            statusLabel.className = "text-[9px] font-black text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full";
+
+            const card = document.getElementById(`mission-card-${missionId}`);
+            card.className = "border border-emerald-400 bg-emerald-50/20 rounded-xl p-4 transition-all flex flex-col justify-between cursor-pointer";
+
+            showToast(`축하합니다! 미션 ${missionId}번을 완벽히 해결하셨습니다!`, "success");
+            
+            currentMission = null;
+            setTimeout(() => {
+                document.getElementById('active-mission-board').classList.add('hidden');
+            }, 3000);
+        }
+
+        // --- 4. 인라인 HTML 바인딩을 위한 전역 함수 노출 ---
+        window.showRoleSelectView = showRoleSelectView;
+        window.showTeacherLoginView = showTeacherLoginView;
+        window.showStudentLoginView = showStudentLoginView;
+        window.submitTeacherPassword = submitTeacherPassword;
+        window.submitStudentNickname = submitStudentNickname;
+        window.openTeacherDashboard = openTeacherDashboard;
+        window.closeTeacherDashboard = closeTeacherDashboard;
+        window.promptResetAttendance = promptResetAttendance;
+        window.cancelReset = cancelReset;
+        window.executeResetAttendance = executeResetAttendance;
+        window.switchTab = switchTab;
+        window.addCharacter = addCharacter;
+        window.removeCharacter = removeCharacter;
+        window.resetSimulation = resetSimulation;
+        window.startTugOfWar = startTugOfWar;
+        window.selectMission = selectMission;
+        window.quitMission = quitMission;
+
+    </script>
+</body>
+</html>
